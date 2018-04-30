@@ -26,7 +26,7 @@ This repository contains code to scrape press releases from state GOP party webs
  With the named entities derived from our Java script, we treat these entities as nodes. Individual party press releases are edges connecting names to each other. For example, if a party press release contains the entities "Donald Trump" and "Roy Moore", that press release is an edge linking the nodes "Donald Trump" and "Roy Moore". A network analysis-based approach allows us to quantitatively analyze who and what the parties are talking, and how these entities are linked in party activist language. All network analysis is implemented in the R script.
 
 This part contains four steps:
-⋅⋅* read in .json
-⋅⋅* generate edgelists
-⋅⋅* construct and plot graphs
-⋅⋅* detect and plot communities
+ * read in .json
+ * generate edgelists
+ * construct and plot graphs
+ * detect and plot communities
