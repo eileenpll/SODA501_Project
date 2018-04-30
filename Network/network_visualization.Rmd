@@ -14,7 +14,9 @@ library(jsonlite)
 library(tidyverse)
 
 # read in json file
-dat <- jsonlite::fromJSON("Json_04-15.json", flatten = TRUE)
+dat1 <- jsonlite::fromJSON("Json_04-15.json", flatten = TRUE)
+dat2 <- jsonlite::fromJSON("NodateJsonResult.json", flatten = TRUE)
+dat <- rbind(dat1, dat2)
 
 # Remove non-alphanumeric characters and Leading/Trailing Whitespace
 trimming <- function(lst) {
@@ -26,14 +28,17 @@ trimming <- function(lst) {
 l_lst <- unnest(dat,LOCATION,.drop = NA,.id = "orig_rn")
 
 ## People
-p_lst <- unnest(dat,PERSON,.drop = NA,.id = "orig_rn") %>%
+# press releases w/ more than 20 people are removed b/c they would bias the overall results
+dat_rm <- dat[!sapply(dat$PERSON, function(x) length(x) > 20),]
+p_lst <- unnest(dat_rm,PERSON,.drop = NA,.id = "orig_rn") %>%
         `colnames<-`(c("node","orig_rn")) %>% 
         cbind(., label=rep("people",nrow(.)))
 p_lst$node <- trimming(p_lst$node)
 p_lst$node[p_lst$node =="Obama"]= "Barack Obama"
 p_lst$node[p_lst$node =="Trump" | p_lst$node =="Donald J Trump"]= "Donald Trump"
-# remove nodes that contain certain stop words & that are longer than three word counts
-# also remove unigrams b/c they are mostly unidentifiable
+# remove nodes that contain certain stop words
+# only retain bigrams & trigrams b/c unigrams are mostly unidentifiable
+# and n-grams with n>3 are unlikely to be names
 p_lst <- p_lst[
         !grepl("Obamacare|Said|Gave|Took|Assessing|Under|God", p_lst$node) 
         & !(sapply(gregexpr("\\S+", p_lst$node), length) > 3)
@@ -117,8 +122,7 @@ plot_graph <- function(graph, scale, name = NA) {
                 vertex.size = ifelse(V(graph)$label == "place", 0.1*degree(graph), scale*degree(graph)),
                 vertex.label = name, 
                 vertex.label.cex = 0.5,
-                vertex.label.dist = 0.6,
-                vertex.label.degree= pi/2,
+                vertex.label.dist = 1,
                 vertex.color = c("lightseagreen","red")[(V(graph)$label=="organization") +1],
                 vertex.shape = c("circle","square")[(V(graph)$label=="organization") +1],
                 vertex.frame.color = "gray30",
@@ -152,16 +156,16 @@ g4 <- delete.vertices(p_graph, degree(p_graph) <= threshold4)
 
 pdf(file="people_co-occurrence.pdf")
 plot_graph(g1, 0.03)
-title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrallity > 0")
+title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrality > 0")
 
 plot_graph(g2, 0.05)
-title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrallity > Mean(Degree)")
+title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrality > Mean(Degree)")
 
-plot_graph(g3, 0.08)
-title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrallity > Mean(Degree) + 1SD(Degree)")
+plot_graph(g3, 0.1, V(g3)$name)
+title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
 
 plot_graph(g4, 0.2, V(g4)$name)
-title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrallity > Mean(Degree) + 2SD(Degree)")
+title(main = "The Co-occurrence Network for People", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
 dev.off()
 ```
 #### 3.2 Community Detection
@@ -173,7 +177,7 @@ library(qgraph)
 #install.packages("colorspace")
 library(colorspace)
 
-## function to plot communities w/ different colors
+## function to plot communities w/ different colors ##
 plot_cl <- function(graph, clusters, name = NA) {
         # generate colors to represent different communities
         colrs <- rainbow_hcl(length(clusters))
@@ -207,42 +211,71 @@ plot_cl <- function(graph, clusters, name = NA) {
 
 #### Community Detection ####
 ## walktrap 
-cl_wt <- walktrap.community(g2, weights = E(g2)$weight, steps = 3)
+cl_wt.g2 <- walktrap.community(g2, weights = E(g2)$weight, steps = 3)
+cl_wt.g3 <- walktrap.community(g3, weights = E(g3)$weight, steps = 3)
+cl_wt.g4 <- walktrap.community(g4, weights = E(g4)$weight, steps = 3)
 
 ## fastgreedy
-cl_fg <- fastgreedy.community(g2, weights = E(g2)$weight)
+cl_fg.g2 <- fastgreedy.community(g2, weights = E(g2)$weight)
+cl_fg.g3 <- fastgreedy.community(g3, weights = E(g3)$weight)
+cl_fg.g4 <- fastgreedy.community(g4, weights = E(g4)$weight)
 
 ## spinglass
-cl_sg <- spinglass.community(g2, weights = E(g2)$weight)
+cl_sg.g2 <- spinglass.community(g2, weights = E(g2)$weight)
+cl_sg.g3 <- spinglass.community(g3, weights = E(g3)$weight)
+cl_sg.g4 <- spinglass.community(g4, weights = E(g4)$weight)
 
 ## leading.eigenvector
-cl_eigen <- leading.eigenvector.community(g2, weights = E(g2)$weight)
-
+cl_eigen.g2 <- leading.eigenvector.community(g2, weights = E(g2)$weight, options = list(maxiter = 5000))
+cl_eigen.g3 <- leading.eigenvector.community(g3, weights = E(g3)$weight)
+cl_eigen.g4 <- leading.eigenvector.community(g4, weights = E(g4)$weight)
 ## infomap
-cl_info <- infomap.community(g2, e.weights = E(g2)$weight)
+cl_info.g2 <- infomap.community(g2, e.weights = E(g2)$weight)
+cl_info.g3 <- infomap.community(g3, e.weights = E(g3)$weight)
+cl_info.g4 <- infomap.community(g4, e.weights = E(g4)$weight)
 
 ## save the plots
 pdf("p_communities.pdf")
-plot_cl(g2, cl_wt,
+plot_cl(g2, cl_wt.g2,
         # display labels for nodes w/ high betweenness
         ifelse(betweenness(g2) >= 10000, V(g2)$name, NA))
 title(main = "Communities Identified by the Walktrap Algorithm")
-
-plot_cl(g2, cl_fg,
+plot_cl(g2, cl_fg.g2,
         ifelse(betweenness(g2) >= 10000, V(g2)$name, NA))
 title(main = "Communities Identified by the Fast Greedy Algorithm")
-
-plot_cl(g2, cl_sg,
+plot_cl(g2, cl_sg.g2,
         ifelse(betweenness(g2) >= 10000, V(g2)$name, NA))
 title(main = "Communities Identified by the Spinglass Algorithm")
-
-plot_cl(g2, cl_eigen,
+plot_cl(g2, cl_eigen.g2,
         ifelse(betweenness(g2) >= 10000, V(g2)$name, NA))
 title(main = "Communities Identified by the Leading Eigenvector Algorithm")
-
-plot_cl(g2, cl_info,
+plot_cl(g2, cl_info.g2,
         ifelse(betweenness(g2) >= 10000, V(g2)$name, NA))
 title(main = "Communities Identified by the Infomap Algorithm")
+dev.off()
+
+pdf("p_communities_filtered.pdf")
+plot_cl(g3, cl_wt.g3, V(g3)$name)
+title(main = "Communities Identified by the Walktrap Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
+plot_cl(g3, cl_fg.g3, V(g3)$name)
+title(main = "Communities Identified by the Fast Greedy Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
+plot_cl(g3, cl_sg.g3,V(g3)$name)
+title(main = "Communities Identified by the Spinglass Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
+plot_cl(g3, cl_eigen.g3,V(g3)$name)
+title(main = "Communities Identified by the Leading Eigenvector Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
+plot_cl(g3, cl_info.g3,V(g3)$name)
+title(main = "Communities Identified by the Infomap Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 1SD(Degree)")
+
+plot_cl(g4, cl_wt.g4,V(g4)$name)
+title(main = "Communities Identified by the Walktrap Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
+plot_cl(g4, cl_fg.g4,V(g4)$name)
+title(main = "Communities Identified by the Fast Greedy Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
+plot_cl(g4, cl_sg.g4,V(g4)$name)
+title(main = "Communities Identified by the Spinglass Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
+plot_cl(g4, cl_eigen.g4,V(g4)$name)
+title(main = "Communities Identified by the Leading Eigenvector Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
+plot_cl(g4, cl_info.g4,V(g4)$name)
+title(main = "Communities Identified by the Infomap Algorithm", sub = "Threshold: Degree Centrality > Mean(Degree) + 2SD(Degree)")
 dev.off()
 
 nodal_attr <- node_attr(g2) %>% 
@@ -251,14 +284,7 @@ nodal_attr <- node_attr(g2) %>%
                spinglass = cl_sg$membership,
                leading.eigenvector = cl_eigen$membership,
                infomap = cl_info$membership) 
-write.csv(nodal_attr, "community identification.csv")
+write.csv(nodal_attr, "community detection.csv")
 
-
-# cl_wt.g3 <- walktrap.community(g3, weights = E(g3)$weight, steps = 3)
-plot_cl(g3, cl_wt.g3,
-        ifelse(betweenness(g3) >= 50000, V(g3)$name, NA))
-
-# cl_wt.g4 <- walktrap.community(g4, weights = E(g4)$weight, steps = 3)
-plot_cl(g4, cl_wt.g4,V(g4)$name)
 
 ```
