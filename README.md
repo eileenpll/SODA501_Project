@@ -19,7 +19,7 @@ This repository contains code to scrape press releases from state GOP party webs
  We utilize Stanford NER, a Java implementation of a Named Entity Recognizer. Per the Stanford NLP Group website: "Named Entity Recognition (NER) labels sequences of words in a text which are the names of things, such as person and company names, or gene and protein names. It comes with well-engineered feature extractors for Named Entity Recognition, and many options for defining feature extractors." For more information regarding this implementation, please visit https://nlp.stanford.edu/software/CRF-NER.html.
  
  
- ### 3. Entity-based Co-Occurence Network Analysis
+ ### 3. [Entity-based Co-Occurence Network Analysis](https://github.com/stevenjmorgan/SODA501_Project/tree/master/Network)
  #### [network visualization.Rmd](https://github.com/stevenjmorgan/SODA501_Project/blob/master/Network/network_visualization.Rmd)
 
  
